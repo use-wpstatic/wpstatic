@@ -1,0 +1,84 @@
+.wpstatic-export-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 16px;
+	margin: 0 0 16px;
+}
+
+.wpstatic-export-actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.wpstatic-export-actions .button .dashicons {
+	margin-right: 4px;
+	font-size: 16px;
+	line-height: 1.2;
+}
+
+#wpstatic-export-spinner {
+	width: 24px;
+	height: 24px;
+	background-size: 24px 24px;
+}
+
+.wpstatic-export-log-window {
+	background: #111;
+	color: #f0f0f1;
+	font-family: Consolas, Monaco, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	height: 240px;
+	overflow-y: auto;
+	padding: 12px;
+	border-radius: 4px;
+	white-space: pre-wrap;
+}
+
+.wpstatic-log-line {
+	display: block;
+}
+
+.wpstatic-log-line-error {
+	color: #dc2316;
+	font-weight: 600;
+}
+
+.wpstatic-log-line-success {
+	color: #3fb950;
+	font-weight: 600;
+}
+
+.wpstatic-link-disabled {
+	opacity: 0.55;
+	pointer-events: none;
+	cursor: default;
+}
+
+.wpstatic-post-zip-instructions {
+	margin-top: 14px;
+	padding: 14px 16px;
+	border: 1px solid #b7e4c7;
+	border-left: 4px solid #2e7d32;
+	border-radius: 6px;
+	background: #f4fff7;
+	color: #1f6f2c;
+}
+
+.wpstatic-post-zip-instructions p {
+	margin: 0 0 8px;
+	line-height: 1.45;
+}
+
+.wpstatic-post-zip-instructions p:last-child {
+	margin-bottom: 0;
+}
+
+.wpstatic-post-zip-instructions-title {
+	font-weight: 600;
+	font-size: 14px;
+	color: #176521;
+}

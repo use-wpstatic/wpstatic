@@ -1,0 +1,191 @@
+/* Ensure full-width layout on WPStatic admin page */
+body.wpstatic-admin-page #wpbody-content {
+	float: none !important;
+	width: 100% !important;
+	max-width: none !important;	
+}
+
+body.wpstatic-admin-page .wrap {
+	max-width: none !important;
+	width: 100% !important;
+}
+
+.wpstatic-admin-shell {
+	--wpstatic-header-bg: #223e62;
+	--wpstatic-header-text: #ffffff;
+	--wpstatic-accent: #2563eb;
+	--wpstatic-accent-soft: #e8f0ff;
+	--wpstatic-border: #dcdcde;
+	margin-right: 20px;
+}
+
+.wpstatic-admin-header {
+	background: var(--wpstatic-header-bg);
+	color: var(--wpstatic-header-text);
+	border-radius: 6px;
+	padding: 18px 20px;
+	margin-bottom: 20px;	
+}
+
+.wpstatic-admin-header-inner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.wpstatic-admin-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.wpstatic-admin-brand-name {
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: 0.4px;
+}
+
+.wpstatic-admin-brand-version {
+	font-size: 12px;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.18);
+}
+
+.wpstatic-admin-main {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 28px;
+	align-items: stretch;
+	width: 100%;
+}
+
+.wpstatic-admin-sidebar {
+	flex: 0 0 260px;
+}
+
+.wpstatic-admin-content {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: visible;
+}
+
+.wpstatic-layout-sidebar-right .wpstatic-admin-main {
+	flex-direction: row-reverse;
+}
+
+.wpstatic-layout-sidebar-right .wpstatic-admin-sidebar {
+	order: 0;
+}
+
+.wpstatic-layout-sidebar-hidden .wpstatic-admin-main {
+	flex-wrap: nowrap;
+}
+
+.wpstatic-layout-sidebar-hidden .wpstatic-admin-sidebar {
+	display: none;
+}
+
+.wpstatic-layout-sidebar-hidden .wpstatic-admin-content {
+	flex: 1 1 100%;
+}
+
+.wpstatic-admin-sidebar .card,
+.wpstatic-admin-content .card {
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	max-width: none;
+}
+
+.wpstatic-admin-sidebar .card {
+	padding: 16px;
+}
+
+.wpstatic-admin-content .card {	
+	width: 100%;
+	box-sizing: border-box;
+	padding: 20px;
+}
+
+.wpstatic-admin-sidebar-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-bottom: 12px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--wpstatic-border);
+	font-weight: 600;
+}
+
+.wpstatic-admin-plugin-name {
+	font-size: 14px;
+}
+
+.wpstatic-admin-plugin-version {
+	font-size: 12px;
+	color: #50575e;
+	background: #f0f0f1;
+	padding: 2px 6px;
+	border-radius: 999px;
+}
+
+.wpstatic-admin-tabs {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.wpstatic-admin-tab {
+	display: block;
+	padding: 10px 12px;
+	border-radius: 6px;
+	border: 1px solid transparent;
+	text-decoration: none;
+	color: #1d2327;
+	font-weight: 600;
+	transition: all 0.15s ease-in-out;
+}
+
+.wpstatic-admin-tab:hover {
+	background: var(--wpstatic-accent-soft);
+	border-color: #c9d9ff;
+	color: #1d4ed8;
+}
+
+.wpstatic-admin-tab.is-active {
+	background: #dbeafe;
+	border-color: #bfdbfe;
+	color: #1e40af;
+	box-shadow: inset 3px 0 0 var(--wpstatic-accent);
+}
+
+.wpstatic-admin-title {
+	margin-top: 0;
+	margin-bottom: 16px;
+	font-size: 22px;
+}
+
+@media (max-width: 1200px) {
+	.wpstatic-admin-sidebar {
+		flex: 0 0 220px;
+	}
+}
+
+@media (max-width: 960px) {
+	.wpstatic-admin-main {
+		flex-direction: column;
+	}
+
+	.wpstatic-admin-sidebar {
+		flex: 0 0 auto;
+		order: 0;
+	}
+
+	.wpstatic-admin-content {
+		flex: 1 1 auto;
+	}
+
+	.wpstatic-layout-sidebar-right .wpstatic-admin-main {
+		flex-direction: column;
+	}
+}
