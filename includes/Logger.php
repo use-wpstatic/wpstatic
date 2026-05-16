@@ -422,10 +422,11 @@ class Logger {
 		$filename = basename( $path );
 		header( 'Content-Type: text/plain; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="' . esc_attr( $filename ) . '"' );
-		header( 'Content-Length: ' . strlen( esc_html( $content ) ) );
+		header( 'Content-Length: ' . strlen( $content ) );
 		header( 'Cache-Control: no-cache, must-revalidate' );
 
-		echo esc_html( $content );
+		// The response is a text/plain attachment; preserve the log exactly.
+		echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		exit;
 	}
 

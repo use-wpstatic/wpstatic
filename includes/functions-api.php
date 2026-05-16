@@ -164,6 +164,206 @@ function wpstatic_get_option_bool( $option_name, $default = false ) {
 }
 
 /**
+ * Save one or more WordPress options from a name => value map.
+ *
+ * Values may be scalar values or arrays. The caller is responsible for
+ * sanitizing and authorizing the data before it reaches this helper.
+ *
+ * @param array<string, mixed> $options Option values keyed by option name.
+ * @return bool True when all options were saved or already had the requested value.
+ */
+function wpstatic_save_options( array $options ) {
+	foreach ( $options as $option_name => $option_value ) {
+		$option_name = (string) $option_name;
+		if ( '' === $option_name ) {
+			return false;
+		}
+
+		$missing = new \stdClass();
+		$current = get_option( $option_name, $missing );
+		$updated = update_option( $option_name, $option_value );
+		if ( ! $updated && $current === $missing ) {
+			$updated = add_option( $option_name, $option_value );
+		}
+
+		// Use loose inequality so equivalent scalars (e.g. bool true vs int 1) do not fail saves.
+		if ( ! $updated && get_option( $option_name, $missing ) != $option_value ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
+
+/**
+ * Detects whether HTTP Basic Authentication is actively protecting
+ * this WordPress site from public access.
+ *
+ * Uses two independent methods:
+ *   1. Loopback HTTP request  — sends an unauthenticated GET to home_url('/') and
+ *      inspects the response for a 401 status + WWW-Authenticate: Basic header.
+ *      Works on Apache AND Nginx. This is the authoritative check.
+ *
+ *   2. .htaccess parse (Apache fallback) — scans the root .htaccess for the
+ *      three required Basic Auth directives. Used when the loopback request
+ *      fails (e.g. loopback blocked by server config or firewall).
+ *
+ * @return array {
+ *     @type bool        $protected  True if Basic Auth is detected.
+ *     @type string|null $method     How it was detected: 'loopback', 'htaccess', or null.
+ *     @type string|null $realm      Auth realm extracted from WWW-Authenticate header (loopback only).
+ *     @type string|null $error      Error message if loopback failed, null otherwise.
+ * }
+ */
+function wpstatic_detect_basic_auth() {
+
+    $result = [
+        'protected' => false,
+        'method'    => null,
+        'realm'     => null,
+        'error'     => null,
+    ];
+
+    // -------------------------------------------------------------------------
+    // METHOD 1: Loopback HTTP request (works on Apache and Nginx)
+    //
+    // We intentionally send NO Authorization header. A properly configured
+    // Basic Auth setup MUST respond with:
+    //   HTTP/1.1 401 Unauthorized
+    //   WWW-Authenticate: Basic realm="..."
+    //
+    // Checking BOTH conditions prevents false positives from unrelated 401s
+    // (e.g. REST API permission errors, maintenance mode plugins, etc.).
+    // -------------------------------------------------------------------------
+    $response = wp_remote_get(
+        home_url( '/' ),
+        [
+            'timeout'     => 10,
+            'redirection' => 0,       // Do not follow redirects — a redirect to a
+                                      // login page is NOT Basic Auth.
+            'sslverify'   => false,   // Allow self-signed certs in dev environments.
+            'headers'     => [],      // Explicitly no Authorization header.
+        ]
+    );
+
+    if ( is_wp_error( $response ) ) {
+        // Loopback failed — record the error and fall through to Method 2.
+        $result['error'] = sprintf(
+            'Loopback request failed: %s',
+            $response->get_error_message()
+        );
+    } else {
+        $http_status   = (int) wp_remote_retrieve_response_code( $response );
+        $www_auth_header = wp_remote_retrieve_header( $response, 'www-authenticate' );
+
+        if ( 401 === $http_status && false !== stripos( $www_auth_header, 'Basic' ) ) {
+            // Definitive match: 401 + "Basic" in WWW-Authenticate.
+            $result['protected'] = true;
+            $result['method']    = 'loopback';
+
+            // Extract the realm name for informational use.
+            if ( preg_match( '/realm\s*=\s*["\']?([^"\']+)["\']?/i', $www_auth_header, $matches ) ) {
+                $result['realm'] = trim( $matches[1] );
+            }
+
+            return $result; // Conclusive — no need to check .htaccess.
+        }
+
+        // A 200 here means the site is publicly accessible.
+        // Other codes (403, 503, etc.) are ambiguous — fall through to Method 2.
+    }
+
+    // -------------------------------------------------------------------------
+    // METHOD 2: Parse root .htaccess (Apache only, fallback)
+    //
+    // A valid Basic Auth block requires all three of these directives:
+    //   AuthType Basic
+    //   AuthUserFile /path/to/.htpasswd
+    //   Require valid-user  (or Require user <name>)
+    //
+    // Note: This does NOT detect Basic Auth configured in httpd.conf or a
+    // virtual host file, nor Nginx auth_basic directives. Method 1 covers
+    // those cases reliably.
+    // -------------------------------------------------------------------------
+    $htaccess_path = ABSPATH . '.htaccess';
+
+    if ( file_exists( $htaccess_path ) && is_readable( $htaccess_path ) ) {
+        $htaccess_content = file_get_contents( $htaccess_path );
+
+        if ( false !== $htaccess_content ) {
+            $has_auth_type     = (bool) preg_match( '/^\s*AuthType\s+Basic\s*$/mi',       $htaccess_content );
+            $has_auth_userfile = (bool) preg_match( '/^\s*AuthUserFile\s+\S+/mi',          $htaccess_content );
+            $has_require       = (bool) preg_match( '/^\s*Require\s+(valid-user|user\s+)/mi', $htaccess_content );
+
+            if ( $has_auth_type && $has_auth_userfile && $has_require ) {
+                $result['protected'] = true;
+                $result['method']    = 'htaccess';
+            }
+        }
+    }
+
+    return $result;
+}
+
+
+/**
+ * Simple boolean wrapper around wpstatic_detect_basic_auth().
+ *
+ * Use this when you only need a yes/no answer and don't care
+ * about how the detection was made.
+ *
+ * @return bool True if Basic Auth is protecting the site.
+ */
+function wpstatic_is_basic_auth_enabled() {
+    return wpstatic_detect_basic_auth()['protected'];
+}
+
+
+/**
+ * Encrypts a plaintext string using AES-256-CBC.
+ * Key is derived from WordPress secret keys (filesystem, not DB).
+ *
+ * @param string $plaintext
+ * @return string  Base64-encoded IV + ciphertext, safe to store in wp_options.
+ */
+function wpstatic_encrypt( string $plaintext ) {
+    $key    = hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true ); // 32 bytes → AES-256
+    $iv     = random_bytes( 16 );                                  // Unique IV per encryption
+    $cipher = openssl_encrypt( $plaintext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+
+    if ( false === $cipher ) {
+        // openssl_encrypt failed — log and handle gracefully in your plugin.
+        return '';
+    }
+
+    return base64_encode( $iv . $cipher ); // Prepend IV so we can decrypt later.
+}
+
+/**
+ * Decrypts a value previously encrypted by wpstatic_encrypt().
+ *
+ * @param string $stored  The base64 value from wp_options.
+ * @return string  Original plaintext, or empty string on failure.
+ */
+function wpstatic_decrypt( string $stored ) {
+    $key    = hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY, true );
+    $raw    = base64_decode( $stored, true );
+
+    if ( false === $raw || strlen( $raw ) < 17 ) {
+        return ''; // Corrupted or empty.
+    }
+
+    $iv         = substr( $raw, 0, 16 );
+    $ciphertext = substr( $raw, 16 );
+    $plaintext  = openssl_decrypt( $ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+
+    return ( false !== $plaintext ) ? $plaintext : '';
+}
+
+
+/**
  * Return a filesystem adapter for local file operations.
  *
  * @return \WP_Filesystem_Base|false
@@ -843,9 +1043,10 @@ function wpstatic_get_all_settings() {
 	$settings = array();
 	$rows     = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$wpdb->prepare(
-			'SELECT option_name, option_value FROM %i WHERE option_name LIKE %s',
+			'SELECT option_name, option_value FROM %i WHERE option_name LIKE %s AND option_name NOT LIKE %s',
 			$wpdb->options,
-			'wpstatic_%'
+			'wpstatic_%',
+			'%_transient_%'
 		),
 		ARRAY_A
 	);
@@ -861,10 +1062,33 @@ function wpstatic_get_all_settings() {
 
 		$name  = (string) $row['option_name'];
 		$value = maybe_unserialize( $row['option_value'] );
+		if ( 0 === strpos( $name, 'wpstatic_http_basic_auth' ) ) {
+			$value = wpstatic_redact_http_basic_auth_settings( $value );
+		}
 		$settings[ $name ] = wpstatic_sanitize_diagnostics_value( $value );
 	}
 
 	return $settings;
+}
+
+/**
+ * Redact HTTP Basic Auth credentials from diagnostics settings output.
+ *
+ * @param mixed $value Option value.
+ * @return mixed
+ */
+function wpstatic_redact_http_basic_auth_settings( $value ) {
+	if ( ! is_array( $value ) ) {
+		return '[REDACTED]';
+	}
+
+	foreach ( array( 'username', 'password' ) as $field ) {
+		if ( array_key_exists( $field, $value ) ) {
+			$value[ $field ] = '[REDACTED]';
+		}
+	}
+
+	return $value;
 }
 
 /**

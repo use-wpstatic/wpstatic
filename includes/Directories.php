@@ -788,7 +788,10 @@ class Directories {
 	 */
 	private function ensure_directory( $dir ) {
 		if ( ! is_dir( $dir ) ) {
-			wp_mkdir_p( $dir );
+			
+			if ( ! wp_mkdir_p( $dir ) ) {
+				return;
+			}
 		}
 
 		if ( ! $this->upload_dir_is_above_webroot() ) {

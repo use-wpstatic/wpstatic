@@ -108,7 +108,16 @@ class Menu {
 			true
 		);
 
+		wp_enqueue_script(
+			WPSTATIC_SLUG . '-admin-settings',
+			WPSTATIC_URL . 'assets/js/admin-settings.js',
+			array( 'jquery' ),
+			WPSTATIC_VERSION,
+			true
+		);
+
 		$ui_status = wpstatic_export_job()->get_ui_export_status();
+		$auto_start_export = filter_input( INPUT_GET, 'wpstatic_auto_start_export', FILTER_SANITIZE_NUMBER_INT );
 
 		wp_localize_script(
 			WPSTATIC_SLUG . '-export',
@@ -150,6 +159,36 @@ class Menu {
 				'msgTempDirectoriesDeleted' => __( 'Temporary directories deleted.', 'wpstatic' ),
 				'msgActiveExportInProgress' => __( 'An export is in progress. Use Pause or Abort to control it, or wait for completion.', 'wpstatic' ),
 				'msgActiveExportPaused' => __( 'Export is paused. Click Resume to continue or Abort to cancel.', 'wpstatic' ),
+				'autoStartExport'       => '1' === (string) $auto_start_export,
+			)
+		);
+
+		wp_localize_script(
+			WPSTATIC_SLUG . '-admin-settings',
+			'wpstaticAdminSettingsData',
+			array(
+				'ajaxUrl'                   => admin_url( 'admin-ajax.php' ),
+				'nonce'                     => wp_create_nonce( 'wpstatic_settings_nonce' ),
+				'makeStaticSiteUrl'         => add_query_arg(
+					array(
+						'page' => WPSTATIC_SLUG,
+						'tab'  => 'make-static-site',
+					),
+					admin_url( 'admin.php' )
+				),
+				'autoStartExportUrl'        => add_query_arg(
+					array(
+						'page'                       => WPSTATIC_SLUG,
+						'tab'                        => 'make-static-site',
+						'wpstatic_auto_start_export' => '1',
+					),
+					admin_url( 'admin.php' )
+				),
+				'msgSettingsSaved'          => __( 'Settings saved successfully.', 'wpstatic' ),
+				'msgSettingsSaveError'      => __( 'Settings could not be saved. Please try again.', 'wpstatic' ),
+				'msgGenerateQuestion'       => __( 'Do you want to Generate/Export Static Site now?', 'wpstatic' ),
+				'msgGenerateYes'            => __( 'Yes', 'wpstatic' ),
+				'msgGenerateNo'             => __( "No; I'll do it from the 'Make Static Site' tab later", 'wpstatic' ),
 			)
 		);
 		}
@@ -205,6 +244,31 @@ class Menu {
 	private function get_tabs() {
 		return array(
 			'make-static-site' => __( 'Make Static Site', 'wpstatic' ),
+			'general'          => __( 'General', 'wpstatic' ),
+			'security'         => __( 'Security', 'wpstatic' ),
+		);
+	}
+
+	/**
+	 * Get sidebar tab groups.
+	 *
+	 * @return array
+	 */
+	private function get_tab_groups() {
+		return array(
+			array(
+				'heading' => '',
+				'tabs'    => array(
+					'make-static-site' => __( 'Make Static Site', 'wpstatic' ),
+				),
+			),
+			array(
+				'heading' => __( 'Settings', 'wpstatic' ),
+				'tabs'    => array(
+					'general'  => __( 'General', 'wpstatic' ),
+					'security' => __( 'Security', 'wpstatic' ),
+				),
+			),
 		);
 	}
 
@@ -217,6 +281,10 @@ class Menu {
 	private function get_current_tab( $tabs ) {
 		$default = array_key_first( $tabs );
 		$tab_raw = filter_input( INPUT_GET, 'tab', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+		if ( null === $tab_raw && isset( $_GET['tab'] ) ) {
+			$tab_raw = sanitize_text_field( wp_unslash( $_GET['tab'] ) );
+		}
+
 		$tab     = is_string( $tab_raw ) ? sanitize_key( $tab_raw ) : $default;
 
 		if ( ! array_key_exists( $tab, $tabs ) ) {
@@ -279,18 +347,32 @@ class Menu {
 		echo '</div>';
 
 		echo '<nav class="' . esc_attr( $tabs_class ) . '">';
-		foreach ( $tabs as $tab_key => $tab_label ) {
-			$classes = $tab_class;
-			if ( $tab_key === $current_tab ) {
-				$classes .= ' is-active';
+		foreach ( $this->get_tab_groups() as $group ) {
+			if ( ! empty( $group['heading'] ) ) {
+				printf(
+					'<span class="%1$s">%2$s</span>',
+					esc_attr( $this->get_css_class( 'admin-tab-heading' ) ),
+					esc_html( $group['heading'] )
+				);
 			}
 
-			printf(
-				'<a class="%1$s" href="%2$s">%3$s</a>',
-				esc_attr( $classes ),
-				esc_url( $this->get_tab_url( $tab_key ) ),
-				esc_html( $tab_label )
-			);
+			foreach ( $group['tabs'] as $tab_key => $tab_label ) {
+				if ( ! array_key_exists( $tab_key, $tabs ) ) {
+					continue;
+				}
+
+				$classes = $tab_class;
+				if ( $tab_key === $current_tab ) {
+					$classes .= ' is-active';
+				}
+
+				printf(
+					'<a class="%1$s" href="%2$s">%3$s</a>',
+					esc_attr( $classes ),
+					esc_url( $this->get_tab_url( $tab_key ) ),
+					esc_html( $tab_label )
+				);
+			}
 		}
 		echo '</nav>';
 
@@ -310,16 +392,111 @@ class Menu {
 		$title_class   = $this->get_css_class( 'admin-title' );
 
 		echo '<section class="' . esc_attr( $content_class ) . '">';
+		/*
+		if ( 'security' === $current_tab ) {
+			$this->render_security_settings_page();
+			echo '</section>';
+			return;
+		}
+		*/
+
 		echo '<div class="card">';
 		echo '<h1 class="' . esc_attr( $title_class ) . '">' . esc_html( $tabs[ $current_tab ] ) . '</h1>';
 		if ( 'make-static-site' === $current_tab ) {
 			$export_page = new Export();
 			$export_page->render();
+		} elseif ( 'general' === $current_tab ) {
+			$this->render_general_settings_page();
+		}
+		elseif ( 'security' === $current_tab ) {
+			$this->render_security_settings_page();			
 		}
 
 		echo '</div>';
 		echo '</section>';
 	}
+
+	/**
+	 * Render the General settings admin page.
+	 *
+	 * @return void
+	 */
+	private function render_general_settings_page() {
+		$allow_insecure_local_http_fetch = wpstatic_get_option_bool( 'wpstatic_allow_insecure_local_http_fetch', false );
+		$prefer_temp_above_docroot       = wpstatic_get_option_bool( 'wpstatic_prefer_temp_storage_above_document_root', false );
+
+		echo '<div class="card ' . esc_attr( $this->get_css_class( 'settings-card' ) ) . '">';
+		echo '<h2>' . esc_html__( 'General Settings', 'wpstatic' ) . '</h2>';
+		echo '<form id="wpstatic-general-settings-form" class="' . esc_attr( $this->get_css_class( 'settings-form' ) ) . '" data-settings-group="general">';
+		echo '<div class="' . esc_attr( $this->get_css_class( 'field' ) ) . ' ' . esc_attr( $this->get_css_class( 'toggle-field' ) ) . '">';
+		echo '<label class="' . esc_attr( $this->get_css_class( 'toggle-label' ) ) . '" for="wpstatic-allow-insecure-local-http-fetch">';
+		echo '<span>';
+		echo '<span class="' . esc_attr( $this->get_css_class( 'toggle-title' ) ) . '">' . esc_html__( 'Allow insecure local HTTP fetch', 'wpstatic' ) . '</span>';
+		echo '<span class="' . esc_attr( $this->get_css_class( 'toggle-description' ) ) . '">' . esc_html__( 'Enable this option to turn off SSL verification for same-site HTTP fetches if an expired, invalid, or self-signed SSL certificate is installed on this WordPress website.', 'wpstatic' ) . '</span>';
+		echo '</span>';
+		echo '<input type="checkbox" id="wpstatic-allow-insecure-local-http-fetch" name="allow_insecure_local_http_fetch" value="1" role="switch"' . checked( $allow_insecure_local_http_fetch, true, false ) . '>';
+		echo '<span class="' . esc_attr( $this->get_css_class( 'toggle-switch' ) ) . '" aria-hidden="true"></span>';
+		echo '</label>';
+		echo '</div>';
+		echo '<div class="' . esc_attr( $this->get_css_class( 'field' ) ) . ' ' . esc_attr( $this->get_css_class( 'toggle-field' ) ) . '">';
+		echo '<label class="' . esc_attr( $this->get_css_class( 'toggle-label' ) ) . '" for="wpstatic-prefer-temp-storage-above-document-root">';
+		echo '<span>';
+		echo '<span class="' . esc_attr( $this->get_css_class( 'toggle-title' ) ) . '">' . esc_html__( 'Prefer temporary storage above document root', 'wpstatic' ) . '</span>';
+		echo '<span class="' . esc_attr( $this->get_css_class( 'toggle-description' ) ) . '">' . esc_html__( 'When enabled, WPStatic tries to use a writable directory above the web document root for exports and logs (home directory or parent of document root). If that is not possible, it falls back to the WordPress uploads folder. Turning this on or off clears the saved upload base path so the new choice can take effect.', 'wpstatic' ) . '</span>';
+		echo '</span>';
+		echo '<input type="checkbox" id="wpstatic-prefer-temp-storage-above-document-root" name="prefer_temp_storage_above_document_root" value="1" role="switch"' . checked( $prefer_temp_above_docroot, true, false ) . '>';
+		echo '<span class="' . esc_attr( $this->get_css_class( 'toggle-switch' ) ) . '" aria-hidden="true"></span>';
+		echo '</label>';
+		echo '</div>';
+		echo '<div id="wpstatic-settings-message" class="' . esc_attr( $this->get_css_class( 'settings-message' ) ) . '" aria-live="polite"></div>';
+		echo '<div id="wpstatic-settings-export-question" class="' . esc_attr( $this->get_css_class( 'settings-export-question' ) ) . '" style="display:none;"></div>';
+		echo '<p class="' . esc_attr( $this->get_css_class( 'settings-actions' ) ) . '">';
+		echo '<button type="button" id="wpstatic-save-general-settings" class="button button-primary">' . esc_html__( 'Save Settings', 'wpstatic' ) . '</button>';
+		echo '</p>';
+		echo '</form>';
+		echo '</div>';
+	}
+
+
+	/**
+	 * Render the Security settings admin page.
+	 *
+	 * @return void
+	 */
+	private function render_security_settings_page() {
+		$credentials = get_option( 'wpstatic_http_basic_auth', array() );
+		if ( ! is_array( $credentials ) ) {
+			$credentials = array();
+		}
+
+		$username = isset( $credentials['username'] ) ? wpstatic_decrypt( (string) $credentials['username'] ) : '';
+		$password = isset( $credentials['password'] ) ? wpstatic_decrypt( (string) $credentials['password'] ) : '';
+		//echo '<div class="card ' . esc_attr( $this->get_css_class( 'settings-card' ) ) . '">';
+		//echo '<h1 class="' . esc_attr( $this->get_css_class( 'admin-title' ) ) . '">' . esc_html__( 'Security Settings', 'wpstatic' ) . '</h1>';
+		echo '<div class="card ' . esc_attr( $this->get_css_class( 'settings-card' ) ) . '">';
+		echo '<h2 class="' . esc_attr( $this->get_css_class( 'admin-title' ) ) . '">' . esc_html__( 'HTTP Basic Auth', 'wpstatic' ) . '</h2>';
+		echo '<p>' . esc_html__( 'HTTP Basic Auth can secure your WordPress website by requiring a username and password before anyone can view it. This is useful when the WordPress website is hosted on a live web server, because you can keep the site password-protected instead of making it public. It lets you work with WPStatic from a real server while keeping visitors and search engines out.', 'wpstatic' ) . '</p>';
+		echo '<p>' . esc_html__( 'If you have secured your WordPress website with HTTP Basic Auth, enter the credentials below so WPStatic can fetch the protected pages during export.', 'wpstatic' ) . '</p>';
+
+		echo '<form id="wpstatic-security-settings-form" class="' . esc_attr( $this->get_css_class( 'settings-form' ) ) . '" data-settings-group="http_basic_auth">';
+		echo '<div class="' . esc_attr( $this->get_css_class( 'field' ) ) . '">';
+		echo '<label for="wpstatic-basic-auth-username">' . esc_html__( 'Username of Basic Auth', 'wpstatic' ) . '</label>';
+		echo '<input type="text" id="wpstatic-basic-auth-username" name="username" value="' . esc_attr( $username ) . '" autocomplete="username">';
+		echo '</div>';
+		echo '<div class="' . esc_attr( $this->get_css_class( 'field' ) ) . '">';
+		echo '<label for="wpstatic-basic-auth-password">' . esc_html__( 'Password of Basic Auth', 'wpstatic' ) . '</label>';
+		echo '<input type="password" id="wpstatic-basic-auth-password" name="password" value="' . esc_attr( $password ) . '" autocomplete="current-password">';
+		echo '</div>';
+		echo '<div id="wpstatic-settings-message" class="' . esc_attr( $this->get_css_class( 'settings-message' ) ) . '" aria-live="polite"></div>';
+		echo '<div id="wpstatic-settings-export-question" class="' . esc_attr( $this->get_css_class( 'settings-export-question' ) ) . '" style="display:none;"></div>';
+		echo '<p class="' . esc_attr( $this->get_css_class( 'settings-actions' ) ) . '">';
+		echo '<button type="button" id="wpstatic-save-security-settings" class="button button-primary">' . esc_html__( 'Save Settings', 'wpstatic' ) . '</button>';
+		echo '</p>';
+		echo '</form>';
+		echo '</div>';
+		//echo '</div>';
+	}
+
 
 /**
  * @todo delete after testing OR

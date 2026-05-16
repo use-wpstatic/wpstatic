@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: WPStatic
- * Description: Generate a fast, secure, static HTML version of your WordPress website. Export to ZIP.
- * Version: 1.0.2
+ * Description: Convert your WordPress site into a blazing-fast, static HTML site and deploy anywhere — no PHP, no database, reduced attack surface in production.
+ * Version: 1.1.0
  * Requires at least: 6.2
  * Requires PHP: 7.4
  * Author: Anindya Sundar Mandal

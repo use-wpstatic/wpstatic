@@ -269,9 +269,19 @@ class Renderer {
 	public function fetch_over_http( $url ) {
 		$timeout = $this->resolve_fetch_timeout( $url );
 		$sslverify = true;
+		$headers   = array(
+			'User-Agent' => 'WPStatic/' . WPSTATIC_VERSION,
+		);
 
 		if ( $this->url_within_site( $url ) && $this->allow_insecure_local_http_fetch_enabled() ) {
 			$sslverify = false;
+		}
+
+		if ( $this->url_within_site( $url ) ) {
+			$authorization = $this->get_configured_basic_auth_header();
+			if ( '' !== $authorization ) {
+				$headers['Authorization'] = $authorization;
+			}
 		}
 
 		$response = wp_remote_get(
@@ -279,9 +289,7 @@ class Renderer {
 			array(
 				'timeout'   => $timeout,
 				'sslverify' => $sslverify,
-				'headers'   => array(
-					'User-Agent' => 'WPStatic/' . WPSTATIC_VERSION,
-				),
+				'headers'   => $headers,
 			)
 		);
 
@@ -858,5 +866,43 @@ class Renderer {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Build an HTTP Basic Authorization header from saved plugin settings.
+	 *
+	 * @return string Authorization header value, or empty string when unavailable.
+	 */
+	private function get_configured_basic_auth_header() {
+		$credentials = get_option( 'wpstatic_http_basic_auth', array() );
+		if ( ! is_array( $credentials ) ) {
+			return '';
+		}
+
+		if ( isset( $credentials['enabled'] ) && ! (bool) $credentials['enabled'] ) {
+			return '';
+		}
+
+		$user = '';
+		$pass = '';
+
+		if ( isset( $credentials['username'] ) ) {
+			$user = wpstatic_decrypt( (string) $credentials['username'] );
+		} elseif ( isset( $credentials['user'] ) ) {
+			$user = wpstatic_decrypt( (string) $credentials['user'] );
+		}
+
+		if ( isset( $credentials['password'] ) ) {
+			$pass = wpstatic_decrypt( (string) $credentials['password'] );
+		} elseif ( isset( $credentials['pass'] ) ) {
+			$pass = wpstatic_decrypt( (string) $credentials['pass'] );
+		}
+
+		$user = trim( $user );
+		if ( '' === $user ) {
+			return '';
+		}
+
+		return 'Basic ' . base64_encode( $user . ':' . $pass );
 	}
 }

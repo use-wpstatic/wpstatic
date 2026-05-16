@@ -79,6 +79,7 @@ class Bootstrap {
 		add_action( 'wp_ajax_wpstatic_get_active_export_status', array( $this, 'ajax_get_active_export_status' ) );
 		add_action( 'wp_ajax_wpstatic_delete_log', array( $this, 'ajax_delete_log' ) );
 		add_action( 'wp_ajax_wpstatic_delete_temp_dirs', array( $this, 'ajax_delete_temp_dirs' ) );
+		add_action( 'wp_ajax_wpstatic_save_settings', array( $this, 'ajax_save_settings' ) );
 		add_action( 'admin_post_wpstatic_download_zip', array( $this, 'handle_zip_download' ) );
 		add_action( 'admin_post_wpstatic_download_log', array( $this, 'handle_log_download' ) );
 		add_action( 'admin_init', array( $this, 'maybe_redirect_after_activation' ) );
@@ -123,7 +124,7 @@ class Bootstrap {
 			return;
 		}
 
-		wp_safe_redirect( admin_url( 'admin.php?page=' . WPSTATIC_SLUG ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . WPSTATIC_SLUG . '&tab=security' ) );
 		exit;
 	}
 
@@ -134,7 +135,7 @@ class Bootstrap {
 	 * @return string[]
 	 */
 	public function add_plugin_action_links( $links ) {
-		$settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=' . WPSTATIC_SLUG ) ) . '">' . esc_html__( 'Settings', 'wpstatic' ) . '</a>';
+		$settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=' . WPSTATIC_SLUG . '&tab=security' ) ) . '">' . esc_html__( 'Settings', 'wpstatic' ) . '</a>';
 		$output        = array();
 		$inserted      = false;
 
@@ -302,12 +303,212 @@ class Bootstrap {
 	}
 
 	/**
+	 * AJAX: save WPStatic settings.
+	 *
+	 * @return void
+	 */
+	public function ajax_save_settings() {
+		$this->validate_settings_ajax_request();
+
+		$settings_group = isset( $_POST['settings_group'] ) ? sanitize_key( wp_unslash( $_POST['settings_group'] ) ) : '';
+		if ( ! in_array( $settings_group, array( 'http_basic_auth', 'general' ), true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Unsupported settings group.', 'wpstatic' ) ) );
+		}
+
+		$options = $this->build_settings_options( $settings_group );
+		if ( ! wpstatic_save_options( $options ) ) {
+			wp_send_json_error( array( 'message' => __( 'Settings could not be saved. Please try again.', 'wpstatic' ) ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'message'              => __( 'Settings saved successfully.', 'wpstatic' ),
+				'has_completed_export' => $this->has_completed_export(),
+				'make_static_site_url' => admin_url( 'admin.php?page=' . WPSTATIC_SLUG . '&tab=make-static-site' ),
+					'auto_start_export_url' => admin_url( 'admin.php?page=' . WPSTATIC_SLUG . '&tab=make-static-site&wpstatic_auto_start_export=1' ),
+			)
+		);
+	}
+
+	/**
+	 * Build option values for a settings group.
+	 *
+	 * @param string $settings_group Settings group slug.
+	 * @return array<string, mixed>
+	 */
+	private function build_settings_options( $settings_group ) {
+		if ( 'general' === $settings_group ) {
+			return $this->build_general_settings_options();
+		}
+
+		return $this->build_http_basic_auth_settings_options();
+	}
+
+	/**
+	 * Build option values for the General settings group.
+	 *
+	 * When `wpstatic_prefer_temp_storage_above_document_root` changes, the cached
+	 * upload base path option must be removed so directory resolution runs again.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function build_general_settings_options() {
+		$options = array();
+
+		if ( isset( $_POST['allow_insecure_local_http_fetch'] ) ) {
+			$options['wpstatic_allow_insecure_local_http_fetch'] = (
+				'1' === (string) sanitize_text_field( wp_unslash( $_POST['allow_insecure_local_http_fetch'] ) )
+			);
+		}
+
+		if ( isset( $_POST['prefer_temp_storage_above_document_root'] ) ) {
+			$current_prefer = wpstatic_get_option_bool( 'wpstatic_prefer_temp_storage_above_document_root', false );
+			$new_prefer     = (
+				'1' === (string) sanitize_text_field( wp_unslash( $_POST['prefer_temp_storage_above_document_root'] ) )
+			);
+
+			if ( $current_prefer !== $new_prefer ) {
+				delete_option( 'wpstatic_upload_directory' );
+			}
+
+			$options['wpstatic_prefer_temp_storage_above_document_root'] = $new_prefer;
+		}
+
+		return $options;
+	}
+
+	/**
+	 * Build option values for the HTTP Basic Auth settings group.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function build_http_basic_auth_settings_options() {
+		$username = isset( $_POST['username'] ) ? sanitize_text_field( wp_unslash( $_POST['username'] ) ) : '';
+		$password = isset( $_POST['password'] ) ? sanitize_text_field( wp_unslash( $_POST['password'] ) ) : '';
+		$options  = array();
+
+		if ( '' === $username && '' === $password ) {
+			$options['wpstatic_http_basic_auth'] = array(
+				'enabled' => false,
+			);
+
+			return $options;
+		}
+
+		$validation_error = $this->validate_http_basic_auth_credentials( $username, $password );
+		if ( '' !== $validation_error ) {
+			wp_send_json_error( array( 'message' => $validation_error ) );
+		}
+
+		$options['wpstatic_http_basic_auth'] = array(
+			'enabled'  => true,
+			'username' => wpstatic_encrypt( $username ),
+			'password' => wpstatic_encrypt( $password ),
+		);
+
+		return $options;
+	}
+
+	/**
+	 * Verify submitted HTTP Basic Auth credentials against the site homepage.
+	 *
+	 * @param string $username HTTP Basic Auth username.
+	 * @param string $password HTTP Basic Auth password.
+	 * @return string Error message, or empty string when credentials are accepted.
+	 */
+	private function validate_http_basic_auth_credentials( $username, $password ) {
+		$response = wp_remote_get(
+			home_url( '/' ),
+			array(
+				'timeout'     => 10,
+				'redirection' => 0,
+				'sslverify'   => false,
+				'headers'     => array(
+					'Authorization' => 'Basic ' . base64_encode( $username . ':' . $password ),
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return sprintf(
+				/* translators: %s: HTTP error message. */
+				__( 'HTTP Basic Auth credentials could not be verified: %s', 'wpstatic' ),
+				$response->get_error_message()
+			);
+		}
+
+		$http_status     = (int) wp_remote_retrieve_response_code( $response );
+		$www_auth_header = wp_remote_retrieve_header( $response, 'www-authenticate' );
+		if ( is_array( $www_auth_header ) ) {
+			$www_auth_header = implode( ', ', $www_auth_header );
+		}
+		$www_auth_header = (string) $www_auth_header;
+
+		if ( 401 === $http_status && false !== stripos( $www_auth_header, 'Basic' ) ) {
+			return __( 'HTTP Basic Auth username or password is incorrect.', 'wpstatic' );
+		}
+
+		if ( in_array( $http_status, array( 401, 403 ), true ) ) {
+			return __( 'The site rejected the HTTP Basic Auth credentials. Please check the username and password.', 'wpstatic' );
+		}
+
+		if ( $http_status >= 200 && $http_status < 400 ) {
+			return '';
+		}
+
+		return sprintf(
+			/* translators: %d: HTTP response status code. */
+			__( 'HTTP Basic Auth credentials could not be verified. The site returned HTTP status %d.', 'wpstatic' ),
+			$http_status
+		);
+	}
+
+	/**
+	 * Check whether a completed static export exists.
+	 *
+	 * @return bool
+	 */
+	private function has_completed_export() {
+		global $wpdb;
+
+		$table = wpstatic_table_name( 'exports' );
+		if ( '' === $table ) {
+			return false;
+		}
+
+		$count = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i WHERE status = %s',
+				$table,
+				'completed'
+			)
+		);
+
+		return (int) $count > 0;
+	}
+
+	/**
 	 * Validate export AJAX nonce and capability.
 	 *
 	 * @return void
 	 */
 	private function validate_export_ajax_request() {
 		if ( ! check_ajax_referer( 'wpstatic_export_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid nonce.', 'wpstatic' ) ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'wpstatic' ) ) );
+		}
+	}
+
+	/**
+	 * Validate settings AJAX nonce and capability.
+	 *
+	 * @return void
+	 */
+	private function validate_settings_ajax_request() {
+		if ( ! check_ajax_referer( 'wpstatic_settings_nonce', 'nonce', false ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid nonce.', 'wpstatic' ) ) );
 		}
 

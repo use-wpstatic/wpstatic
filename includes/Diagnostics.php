@@ -34,7 +34,7 @@ class Diagnostics {
 			'system_information' => array(
 				'wp_version'           => get_bloginfo( 'version' ),
 				'php_version'          => PHP_VERSION,
-				'basic_http_auth'      => ( isset( $_SERVER['PHP_AUTH_USER'] ) && '' !== $_SERVER['PHP_AUTH_USER'] ),
+				'basic_http_auth'      => wpstatic_is_basic_auth_enabled(),
 				'curl_available'       => function_exists( 'curl_version' ),
 				'permalink_structure'  => get_option( 'permalink_structure' ),
 				'permalink_is_plain'   => ( '' === get_option( 'permalink_structure' ) ),

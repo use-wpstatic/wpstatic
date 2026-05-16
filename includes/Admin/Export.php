@@ -70,5 +70,25 @@ class Export {
 		echo '<button type="button" id="wpstatic-delete-temp" class="button"><span class="dashicons dashicons-trash"></span> ' . esc_html__( 'Delete Temporary Export Directories', 'wpstatic' ) . '</button>';
 		echo '</div>';
 		echo '</div>';
+		//$this->render_basic_auth_manual_test();
 	}
+
+	/**
+	 * Render manual output for the Basic Auth detection helper functions.
+	 *
+	 * @return void
+	 */
+	/*
+	private function render_basic_auth_manual_test() {
+		$detected   = wpstatic_detect_basic_auth();
+		$is_enabled = wpstatic_is_basic_auth_enabled();
+
+		echo '<div class="wpstatic-export-card">';
+		echo '<h2>' . esc_html__( 'HTTP Basic Auth Manual Test', 'wpstatic' ) . '</h2>';
+		echo '<p><code>wpstatic_is_basic_auth_enabled()</code>: <strong>' . esc_html( $is_enabled ? 'true' : 'false' ) . '</strong></p>';
+		echo '<p><code>wpstatic_detect_basic_auth()</code>:</p>';
+		echo '<pre>' . esc_html( wp_json_encode( $detected, JSON_PRETTY_PRINT ) ) . '</pre>';
+		echo '</div>';
+	}
+	*/
 }

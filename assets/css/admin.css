@@ -135,6 +135,14 @@ body.wpstatic-admin-page .wrap {
 	gap: 8px;
 }
 
+.wpstatic-admin-tab-heading {
+	display: block;
+	margin-top: 6px;
+	padding: 10px 12px 2px;
+	color: #1d2327;
+	font-weight: 700;
+}
+
 .wpstatic-admin-tab {
 	display: block;
 	padding: 10px 12px;
@@ -144,6 +152,10 @@ body.wpstatic-admin-page .wrap {
 	color: #1d2327;
 	font-weight: 600;
 	transition: all 0.15s ease-in-out;
+}
+
+.wpstatic-admin-tab-heading ~ .wpstatic-admin-tab {
+	margin-left: 20px;
 }
 
 .wpstatic-admin-tab:hover {
@@ -163,6 +175,146 @@ body.wpstatic-admin-page .wrap {
 	margin-top: 0;
 	margin-bottom: 16px;
 	font-size: 22px;
+}
+
+.wpstatic-settings-card {
+	background: #ffffff;
+}
+
+.wpstatic-settings-form {
+	max-width: 620px;
+}
+
+.wpstatic-field {
+	margin: 18px 0;
+}
+
+.wpstatic-field label {
+	display: block;
+	margin-bottom: 6px;
+	font-weight: 600;
+}
+
+.wpstatic-field input[type="text"],
+.wpstatic-field input[type="password"] {
+	width: 100%;
+	max-width: 420px;
+}
+
+.wpstatic-toggle-field {
+	max-width: 620px;
+	padding: 12px 0;
+}
+
+.wpstatic-toggle-label {
+	display: flex !important;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 0 !important;
+	cursor: pointer;
+}
+
+.wpstatic-toggle-title,
+.wpstatic-toggle-description {
+	display: block;
+}
+
+.wpstatic-toggle-title {
+	margin-bottom: 4px;
+	font-weight: 600;
+}
+
+.wpstatic-toggle-description {
+	color: #646970;
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.4;
+}
+
+.wpstatic-toggle-label input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.wpstatic-toggle-switch {
+	position: relative;
+	flex: 0 0 auto;
+	width: 42px;
+	height: 24px;
+	border-radius: 999px;
+	background: #8c8f94;
+	transition: background 0.15s ease;
+}
+
+.wpstatic-toggle-switch::before {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: #ffffff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+	transition: transform 0.15s ease;
+}
+
+.wpstatic-toggle-label input[type="checkbox"]:checked + .wpstatic-toggle-switch {
+	background: var(--wpstatic-accent);
+}
+
+.wpstatic-toggle-label input[type="checkbox"]:checked + .wpstatic-toggle-switch::before {
+	transform: translateX(18px);
+}
+
+.wpstatic-toggle-label input[type="checkbox"]:focus-visible + .wpstatic-toggle-switch {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.wpstatic-settings-actions {
+	margin-top: 22px;
+}
+
+.wpstatic-settings-message {
+	display: none;
+	margin-top: 18px;
+	padding: 10px 12px;
+	border-left: 4px solid transparent;
+	background: #f6f7f7;
+	font-weight: 600;
+}
+
+.wpstatic-settings-message.is-success {
+	border-left-color: #00a32a;
+	background: #edfaef;
+	color: #0a5d1b;
+}
+
+.wpstatic-settings-message.is-error {
+	border-left-color: #d63638;
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.wpstatic-settings-export-question {
+	margin-top: 16px;
+	padding: 14px 16px;
+	border: 1px solid #c3c4c7;
+	border-radius: 6px;
+	background: #ffffff;
+}
+
+.wpstatic-settings-export-question p {
+	margin: 0 0 10px;
+	font-weight: 600;
+}
+
+.wpstatic-settings-export-question label {
+	display: block;
+	margin: 8px 0;
 }
 
 @media (max-width: 1200px) {

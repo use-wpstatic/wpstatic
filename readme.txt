@@ -1,19 +1,38 @@
-=== WPStatic ===
+=== WPStatic – Static Site Generator ===
 Contributors: speedify
 Tags: static site generator, performance, security, jamstack, cache
 Requires at least: 6.2
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Generate a static HTML version of your WordPress website and download it as a ZIP archive.
+Convert your WordPress site into a blazing-fast, static HTML site and deploy anywhere — no PHP, no database, reduced attack surface in production.
 
 
 == Description ==
 
-WPStatic helps you create a static copy of your WordPress website, facilitating faster content delivery and reducing the security risks on production hosting.
+WPStatic converts your WordPress site into a fully static HTML website — eliminating PHP, databases, and server-side dependencies from your production host. The result: faster load times, a reduced attack surface, and the freedom to deploy on any web server or CDN.
+
+⚡ Benefits: Why WPStatic?
+ 
+* 🚀 **Faster page loads:** Static websites load 3 to 5 times faster than WordPress sites by serving pre-rendered HTML without PHP execution or database queries.
+* 🔒 **Reduced attack surface:** Static sites have no login page, database connection, or server-side code on your production host. This eliminates primary attack vectors such as SQL injection and brute-force attacks.
+* 🌍 **Deploy anywhere:** Host on Cloudflare Pages, GitHub Pages, AWS S3, or any standard web server. No PHP, MySQL, or WordPress dependency is required in production.
+* 💰 **Lower hosting costs:** Static files can be served from free or low-cost CDN-based hosts instead of a PHP-capable server. Managed WordPress hosting typically costs $25 to $100 or more per month, while static hosting is often free or very affordable on platforms like Cloudflare Pages or Netlify, which offer unmetered bandwidth on their free tiers.
+* 🛠️ **Zero production maintenance:** Your live site is pure HTML. With no WordPress running in production, there are no security patches, plugin updates, or server-side dependencies to manage on your public host.
+* 🎛️ **Live export control:** Start, pause, resume, or abort the export from the admin screen and monitor progress in real time.
+* 📦 **One-click download:** The entire static site is packaged as a ZIP file, ready for extraction and upload.
+* 🔄 **Auto-resume on interruption:** If internet connectivity drops during export, the job resumes automatically once the connection is restored.
+ 
+🔍 SEO Benefits
+ 
+* 📊 **Better Core Web Vitals scores:** Static HTML loads faster, directly improving Time to First Byte (TTFB) and Largest Contentful Paint (LCP), which are metrics Google uses as ranking signals.
+* 🤖 **Improved crawl efficiency:** Search engine bots fetch plain HTML instantly, with no server-side rendering delay. This signals high crawl health and allows engines to index content more effectively.
+* ⏱️ **Higher uptime reliability:** Static files served from a CDN experience near-zero downtime, helping avoid Google ranking penalties for frequently unreachable URLs.
+* 🧹 **No WordPress footprint in production:** Common WordPress paths such as /wp-admin and /wp-login.php are removed from the live site, reducing spam crawling and preserving crawl budget.
+
 
 The admin screen provides the following capabilities:
 
@@ -45,15 +64,23 @@ WPStatic will not work on any WordPress website that generates content dynamical
 
 Contact forms will not work. The contact form requires immediate backend processing upon submission by the user. However, this is on our roadmap.
 
+= HTTP Basic Authentication =
+
+If your WordPress install is protected with HTTP Basic Auth (for example, a staging or subdomain install), enter your credentials under **WPStatic → Settings → Security** so WPStatic can authenticate during export. 
+
+Credentials are encrypted before storage and never exposed in logs or diagnostics output.
+
 = Advanced Opt-In Options =
 
-WPStatic includes two optional safety/compatibility flags (both disabled by default):
+WPStatic includes two optional safety/compatibility flags, both disabled by default and configurable from the **WPStatic → Settings → General** screen.
 
-* `wpstatic_prefer_temp_storage_above_document_root`  
-Set to `true` (in the options table) only if you explicitly want WPStatic working directories outside `wp_upload_dir()`. By default, WPStatic uses WordPress uploads paths.
+* **Allow insecure local HTTP fetch**
+Enable this only for expired, invalid, or self-signed certificate environments where same-site HTTPS fetches fail TLS verification. This turns off SSL verification only for local same-site fetches.
 
-* `wpstatic_allow_insecure_local_http_fetch`  
-Set to `true` (in the options table) only for local/self-signed certificate environments where same-site HTTPS fetches fail TLS verification. This disables SSL verification for local same-site fetches.
+* **Prefer temporary storage above document root**
+Enable this only if you explicitly want WPStatic working directories outside `wp_upload_dir()`. By default, WPStatic uses WordPress uploads paths. Please note that this option works only if the intended directory is readable and writable by the web server user.
+
+Both flags can also be set directly in the options table if preferred.
 
 = Need Help? =
 
@@ -61,11 +88,12 @@ If you face any issues after installing the WPStatic plugin, please open a suppo
 
 == Installation ==
 
-1. Upload the plugin to the plugins folder (`wp-content/plugins/`), or install it through the WordPress Plugins screen, click 'Add Plugin', and search with **WPStatic**.
-2. Click the 'Activate' button, or activate the plugin from the **Installed Plugins** screen.
-3. Open **WPStatic** from the WordPress admin menu.
-4. Click the **Generate/Export Static Site** button and wait for completion.
-5. Download the ZIP and deploy the exported files to your chosen host.
+1. Download the 'WPStatic' plugin zip file by clicking the 'Download' button at the top-right of this page. Upload the plugin to the plugins folder (`wp-content/plugins/`).
+2. Or install it via **WordPress Admin → Plugins → Add Plugin → In the 'Search Plugins' field search for "Statixly" → Once you find the "Statixly" plugin, click the ‘Install Now’ button.**
+3. Click the 'Activate' button, or activate the plugin from the **Installed Plugins** screen.
+4. Open **WPStatic** from the WordPress admin menu.
+5. Click the **Generate/Export Static Site** button and wait for completion.
+6. Download the ZIP and deploy the exported files to your chosen host.
 
 == Frequently Asked Questions ==
 
@@ -90,10 +118,23 @@ Yes. Logs can be downloaded using the **Download Export Log** button, and you ca
 
 == Screenshots ==
 
-1. Track the export progress in real-time with Export Status Log.
-2. Export, Download, and Delete buttons.
+1. 'Make Static Site' screen
+2. Track the export progress in real-time with Export Status Log.
+3. Export, Download, and Delete buttons.
+4. General Settings
+5. Security Settings → HTTP Basic Auth
 
 == Changelog ==
+
+= 1.1.0 =
+* Feature: Added HTTP Basic Authentication support — WPStatic now forwards Basic Auth headers during export, enabling crawling of password-protected WordPress installs.
+* Feature: Introduced a Settings page in the admin interface with General and Security tabs.
+* Feature: Advanced opt-in flags (wpstatic_allow_insecure_local_http_fetch and wpstatic_prefer_temp_storage_above_document_root) are now configurable directly from the admin Settings page, without requiring manual database edits.
+* Security: HTTP Basic Auth credentials are encrypted before storage and decrypted only at runtime.
+* Security: HTTP Basic Auth credentials are redacted from diagnostics output and export logs.
+* Improvement: Settings query now excludes transient options, improving performance and ensuring cleaner data retrieval.
+* Fix: Logger now returns accurate content-length headers and preserves log content correctly in plain text responses.
+* Maintenance: Relicensed plugin metadata and license text to GPLv2 or later.
 
 = 1.0.2 =
 * Fix: Uninstall flow now reliably loads required helper functions before cleanup.
@@ -124,5 +165,5 @@ Yes. Logs can be downloaded using the **Download Export Log** button, and you ca
 
 == Upgrade Notice ==
 
-= 1.0.2 =
-Recommended update. Improves plugin deletion reliability by fixing uninstall bootstrap loading.
+= 1.1.0 =
+Recommended update. Improves release packaging checks and finalizes GPLv2-or-later licensing metadata.

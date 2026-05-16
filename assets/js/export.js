@@ -522,48 +522,54 @@
 			} );
 	}
 
-	function bindEvents() {
-		$( '#wpstatic-start-export' ).on( 'click', function () {
+	function startExport( skipConfirm ) {
+		if ( ! skipConfirm ) {
 			if ( ! window.confirm( wpstaticExportData.confirmStartExport ) ) {
 				return;
 			}
+		}
 
-			state.lastSequence = 0;
+		state.lastSequence = 0;
 
-			request( 'wpstatic_start_export', {}, { timeout: CHUNK_TIMEOUT } )
-				.done( function ( response ) {
-					var data = response && response.data ? response.data : {};
-					var msg = data.message ? data.message : t( 'msgUnableToStartExport', 'Unable to start export.' );
-					if ( ! response || ! response.success ) {
-						appendLog( msg );
-						if ( isAlreadyRunningError( data ) ) {
-							state.running = true;
-							state.paused  = true;
-							state.recoveryMode = true;
-							setActionButtonsDisabled( false );
-							setRunningUI( true );
-							appendLog( t( 'msgAlreadyRunningControls', 'An export is already running. Use Resume to continue or Abort to cancel.' ) );
-						} else {
-							onBatchStuck();
-						}
-						return;
-					}
-
-					state.running = true;
-					state.paused = false;
-					state.recoveryMode = false;
-					state.offline = false;
-					state.offlineNoticeShown = false;
-					setActionButtonsDisabled( false );
-					setRunningUI( true );
-					appendLog( response.data && response.data.message ? response.data.message : t( 'msgExportStarted', 'Export started.' ) );
-					processBatch();
-				} )
-				.fail( function ( jqXHR, textStatus ) {
-					var msg = ( wpstaticExportData.restartMessage || 'The server did not respond within 30 seconds. Please click the "Resume" button.\n\nIf the export still doesn\'t resume, click "Abort". After the export aborted successfully, reload this page and click "Generate/Export Static Site" again to restart the export process.' );
+		request( 'wpstatic_start_export', {}, { timeout: CHUNK_TIMEOUT } )
+			.done( function ( response ) {
+				var data = response && response.data ? response.data : {};
+				var msg = data.message ? data.message : t( 'msgUnableToStartExport', 'Unable to start export.' );
+				if ( ! response || ! response.success ) {
 					appendLog( msg );
-					onBatchStuck();
-				} );
+					if ( isAlreadyRunningError( data ) ) {
+						state.running = true;
+						state.paused  = true;
+						state.recoveryMode = true;
+						setActionButtonsDisabled( false );
+						setRunningUI( true );
+						appendLog( t( 'msgAlreadyRunningControls', 'An export is already running. Use Resume to continue or Abort to cancel.' ) );
+					} else {
+						onBatchStuck();
+					}
+					return;
+				}
+
+				state.running = true;
+				state.paused = false;
+				state.recoveryMode = false;
+				state.offline = false;
+				state.offlineNoticeShown = false;
+				setActionButtonsDisabled( false );
+				setRunningUI( true );
+				appendLog( response.data && response.data.message ? response.data.message : t( 'msgExportStarted', 'Export started.' ) );
+				processBatch();
+			} )
+			.fail( function ( jqXHR, textStatus ) {
+				var msg = ( wpstaticExportData.restartMessage || 'The server did not respond within 30 seconds. Please click the "Resume" button.\n\nIf the export still doesn\'t resume, click "Abort". After the export aborted successfully, reload this page and click "Generate/Export Static Site" again to restart the export process.' );
+				appendLog( msg );
+				onBatchStuck();
+			} );
+	}
+
+	function bindEvents() {
+		$( '#wpstatic-start-export' ).on( 'click', function () {
+			startExport( false );
 		} );
 
 		$( '#wpstatic-pause-export' ).on( 'click', function () {
@@ -690,6 +696,10 @@
 
 		if ( !! wpstaticExportData.showPostZipInstructions ) {
 			showPostZipInstructions();
+		}
+
+		if ( !! wpstaticExportData.autoStartExport && ! state.running ) {
+			startExport( true );
 		}
 	} );
 }( jQuery, window ) );
